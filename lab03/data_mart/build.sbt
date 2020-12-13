@@ -4,7 +4,7 @@ version := "1.0"
 
 scalaVersion := "2.11.12"
 val sparkVersion = "2.4.7"
-val sparkCassandraConnectorVersion = "2.5.1"
+val sparkCassandraConnectorVersion = "2.4.2"
 val sparkElasticsearchVersion = "7.9.1"
 val postgreSqlVersion = "42.2.10"
 
