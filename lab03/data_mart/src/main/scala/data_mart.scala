@@ -1,8 +1,9 @@
 import common.arguments.ArgumentsReader
 import common.configuration.ConfigReader
-import domain.{Clients, ClientsCategory, DomainCategories, DomainWebCategory, OnlineLogs, ShopCategory, WebLogs}
+import domain.{Clients, ClientsCategory, DomainCategory, DomainWebCategory, OnlineLogs, ShopCategory, WebCategory, WebLogs}
 import org.apache.spark.internal.Logging
-import org.apache.spark.sql.{Dataset, SparkSession}
+import org.apache.spark.sql.{DataFrame, Dataset, SparkSession}
+import org.apache.spark.sql.functions.max
 import spark.{SparkReader, SparkUtils}
 import spark.cassandra.{CassandraConfig, CassandraReader}
 import spark.elasticsearch.{ElasticsearchConfig, ElasticsearchReader}
@@ -79,14 +80,21 @@ object data_mart extends App with Logging {
   logInfo(s"[Lab03] ShopCategory schema:\n${shopCat.printSchema}")
   logInfo(s"[Lab03] ShopCategory sample:\n${shopCat.take(10).mkString("\n")}")
 
-  val postgresql = PostgreSQLReader(postgreSQLConfig)
-  val domainCategories: Dataset[DomainCategories] = postgresql.read(postgresSrcSchema, postgresSrcTable)
-  // [Lab03] DomainCategories count: 245.981
-  logInfo(s"[Lab03] DomainCategories count: ${domainCategories.count}")
-  logInfo(s"[Lab03] DomainCategories schema:\n${domainCategories.printSchema}")
-  logInfo(s"[Lab03] DomainCategories sample:\n${domainCategories.take(10).mkString("\n")}")
+  val shopPiv: DataFrame = SparkUtils.pivotDataFrame(shopCat)(
+    "uid", "shop_cat", "shop_cnt")(max)
+  // [Lab03] ShopPivot count: 29.875
+  logInfo(s"[Lab03] ShopPivot count: ${shopPiv.count}")
+  logInfo(s"[Lab03] ShopPivot schema:\n${shopPiv.printSchema}")
+  logInfo(s"[Lab03] ShopPivot sample:\n${shopPiv.take(10).mkString("\n")}")
 
-  val domainWebCat: Dataset[DomainWebCategory] = SparkUtils.makeWebCategory(domainCategories)
+  val postgresql = PostgreSQLReader(postgreSQLConfig)
+  val domainCategories: Dataset[DomainCategory] = postgresql.read(postgresSrcSchema, postgresSrcTable)
+  // [Lab03] DomainCategory count: 245.981
+  logInfo(s"[Lab03] DomainCategory count: ${domainCategories.count}")
+  logInfo(s"[Lab03] DomainCategory schema:\n${domainCategories.printSchema}")
+  logInfo(s"[Lab03] DomainCategory sample:\n${domainCategories.take(10).mkString("\n")}")
+
+  val domainWebCat: Dataset[DomainWebCategory] = SparkUtils.makeDomainWebCategory(domainCategories)
   // [Lab03] DomainWebCategory count: 245.981
   logInfo(s"[Lab03] DomainWebCategory count: ${domainWebCat.count}")
   logInfo(s"[Lab03] DomainWebCategory schema:\n${domainWebCat.printSchema}")
@@ -97,4 +105,23 @@ object data_mart extends App with Logging {
   logInfo(s"[Lab03] WebLogs count: ${webLogs.count}")
   logInfo(s"[Lab03] WebLogs schema:\n${webLogs.printSchema}")
   logInfo(s"[Lab03] WebLogs sample:\n${webLogs.take(10).mkString("\n")}")
+
+  val webCat: Dataset[WebCategory] = SparkUtils.makeWebCategory(webLogs, domainWebCat)
+  // [Lab03] WebCategory count: 72.501
+  logInfo(s"[Lab03] WebCategory count: ${webCat.count}")
+  logInfo(s"[Lab03] WebCategory schema:\n${webCat.printSchema}")
+  logInfo(s"[Lab03] WebCategory sample:\n${webCat.take(10).mkString("\n")}")
+
+  val webPiv: DataFrame = SparkUtils.pivotDataFrame(webCat)(
+    "uid", "web_cat", "web_cnt")(max)
+  // [Lab03] WebPivot count: 27.933
+  logInfo(s"[Lab03] WebPivot count: ${webPiv.count}")
+  logInfo(s"[Lab03] WebPivot schema:\n${webPiv.printSchema}")
+  logInfo(s"[Lab03] WebPivot sample:\n${webPiv.take(10).mkString("\n")}")
+
+  val shopRes: DataFrame = SparkUtils.fillNull(shopPiv)("shop_")
+  val webRes: DataFrame = SparkUtils.fillNull(shopPiv)("web_")
+
+  val result: DataFrame = SparkUtils.joinClientsPivot(clientsCat, shopRes, webRes)
+  postgresql.write(result)(postgresTgtSchema, postgresTgtTable)
 }
