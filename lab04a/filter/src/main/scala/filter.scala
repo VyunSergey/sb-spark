@@ -3,7 +3,7 @@ import org.apache.spark.sql.{DataFrame, SaveMode, SparkSession}
 import org.apache.spark.sql.types.{LongType, StringType, StructField, StructType}
 import org.apache.spark.sql.functions.{col, date_format, from_json, from_unixtime, struct, to_date, to_json}
 
-import scala.util.{Failure, Success, Try}
+import scala.util.{Success, Try}
 
 object filter extends App with Logging {
   lazy val spark: SparkSession = SparkSession.builder.getOrCreate
@@ -21,7 +21,7 @@ object filter extends App with Logging {
   def parseOffset(offset: String, topic: String): String = {
     Try(offset.toInt) match {
       case Success(i) => s"""{"$topic":{"0":$i}}"""
-      case Failure(_) => offset
+      case _ => offset
     }
   }
 
