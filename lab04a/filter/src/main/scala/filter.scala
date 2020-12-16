@@ -3,12 +3,27 @@ import org.apache.spark.sql.{DataFrame, SaveMode, SparkSession}
 import org.apache.spark.sql.types.{LongType, StringType, StructField, StructType}
 import org.apache.spark.sql.functions.{col, date_format, from_json, from_unixtime, struct, to_date, to_json}
 
+import scala.util.{Failure, Success, Try}
+
 object filter extends App with Logging {
   lazy val spark: SparkSession = SparkSession.builder.getOrCreate
+
   lazy val kafkaHosts = spark.conf.get("spark.filter.hosts", "spark-master-1:6667")
   lazy val kafkaTopic = spark.conf.get("spark.filter.topic_name", "lab04_input_data")
-  lazy val kafkaStartingOffsets = spark.conf.get("spark.filter.offset", "earliest")
+  lazy val kafkaStartingOffsets =
+    parseOffset(
+      spark.conf.get("spark.filter.offset", "earliest"),
+      kafkaTopic
+    )
+
   lazy val hdfsResultDirPrefix = spark.conf.get("spark.filter.output_dir_prefix", "/user/sergey.vyun/visits")
+
+  def parseOffset(offset: String, topic: String): String = {
+    Try(offset.toInt) match {
+      case Success(i) => s"""{"$topic":{"0":$i}}"""
+      case Failure(_) => offset
+    }
+  }
 
   spark.sparkContext.setLogLevel("INFO")
 
