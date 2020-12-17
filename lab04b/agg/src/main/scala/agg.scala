@@ -10,6 +10,7 @@ object agg extends App with Logging {
   val kafkaHosts = "spark-master-1:6667"
   val kafkaInputTopic = "sergey_vyun"
   val kafkaStartingOffsets = "earliest"
+  val kafkaMaxOffsetsPreTrigger = 100L
   val kafkaOutputTopic = "sergey_vyun_lab04b_out"
   val kafkaCheckPointLocation = "/tmp/sergey.vyun/chk/lab04/state"
 
@@ -19,6 +20,7 @@ object agg extends App with Logging {
   logInfo(s"[LAB04B] Kafka hosts: $kafkaHosts")
   logInfo(s"[LAB04B] Kafka input topic: $kafkaInputTopic")
   logInfo(s"[LAB04B] Kafka starting offsets: $kafkaStartingOffsets")
+  logInfo(s"[LAB04B] Kafka max offsets per triger: $kafkaMaxOffsetsPreTrigger")
   logInfo(s"[LAB04B] Kafka output topic: $kafkaOutputTopic")
   logInfo(s"[LAB04B] Kafka checkpoint location: $kafkaCheckPointLocation")
 
@@ -37,7 +39,8 @@ object agg extends App with Logging {
     .option("kafka.bootstrap.servers", kafkaHosts)
     .option("subscribe", kafkaInputTopic)
     .option("startingOffsets", kafkaStartingOffsets)
-    .load()
+    .option("maxOffsetsPerTrigger", kafkaMaxOffsetsPreTrigger)
+    .load
     .select(
       from_json(col("value").cast(StringType), schema).as("json")
     )
@@ -48,7 +51,7 @@ object agg extends App with Logging {
       col("json.uid").as("uid"),
       to_timestamp(from_unixtime(col("json.timestamp").cast(LongType) / 1000)).as("timestamp")
     )
-    .withWatermark("timestamp", "1 minute")
+    .withWatermark("timestamp", "1 hour")
     .groupBy(
       window(col("timestamp"), "1 hour", "1 hour")
     )
@@ -74,10 +77,10 @@ object agg extends App with Logging {
   sdf
     .writeStream
     .format("kafka")
-    //.trigger(Trigger.ProcessingTime("5 seconds"))
+    .outputMode("update")
+    .trigger(Trigger.ProcessingTime("30 seconds"))
     .option("kafka.bootstrap.servers", kafkaHosts)
     .option("topic", kafkaOutputTopic)
     .option("checkpointLocation", kafkaCheckPointLocation)
-    .start()
-
+    .start
 }
