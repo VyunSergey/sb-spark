@@ -83,4 +83,5 @@ object agg extends App with Logging {
     .option("topic", kafkaOutputTopic)
     .option("checkpointLocation", kafkaCheckPointLocation)
     .start
+    .processAllAvailable
 }
