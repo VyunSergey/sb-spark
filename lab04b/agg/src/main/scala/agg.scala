@@ -4,6 +4,8 @@ import org.apache.spark.sql.types.{DoubleType, LongType, StringType, StructField
 import org.apache.spark.sql.functions.{col, from_json, from_unixtime, min, struct, sum, to_json, to_timestamp, unix_timestamp, when, window}
 import org.apache.spark.sql.streaming.{OutputMode, Trigger}
 
+import scala.util.Random
+
 object agg extends App with Logging {
   lazy val spark: SparkSession = SparkSession.builder.getOrCreate
 
@@ -12,7 +14,7 @@ object agg extends App with Logging {
   val kafkaStartingOffsets = "earliest"
   val kafkaMaxOffsetsPreTrigger = 1000L
   val kafkaOutputTopic = "sergey_vyun_lab04b_out"
-  val kafkaCheckPointLocation = "/tmp/sergey.vyun/chk/lab04/state"
+  val kafkaCheckPointLocation = s"/tmp/sergey.vyun/chk/lab04/state${Random.nextInt(1000)}"
 
   spark.sparkContext.setLogLevel("INFO")
 
