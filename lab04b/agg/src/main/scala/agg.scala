@@ -2,7 +2,7 @@ import org.apache.spark.internal.Logging
 import org.apache.spark.sql.{DataFrame, SparkSession}
 import org.apache.spark.sql.types.{DoubleType, LongType, StringType, StructField, StructType}
 import org.apache.spark.sql.functions.{col, from_json, from_unixtime, min, struct, sum, to_json, to_timestamp, unix_timestamp, when, window}
-import org.apache.spark.sql.streaming.Trigger
+import org.apache.spark.sql.streaming.{OutputMode, Trigger}
 
 object agg extends App with Logging {
   lazy val spark: SparkSession = SparkSession.builder.getOrCreate
@@ -77,7 +77,7 @@ object agg extends App with Logging {
   sdf
     .writeStream
     .format("kafka")
-    .outputMode("update")
+    .outputMode(OutputMode.Update)
     .trigger(Trigger.ProcessingTime("30 seconds"))
     .option("kafka.bootstrap.servers", kafkaHosts)
     .option("topic", kafkaOutputTopic)
