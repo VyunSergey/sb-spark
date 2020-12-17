@@ -10,7 +10,7 @@ object agg extends App with Logging {
   val kafkaHosts = "spark-master-1:6667"
   val kafkaInputTopic = "sergey_vyun"
   val kafkaStartingOffsets = "earliest"
-  val kafkaMaxOffsetsPreTrigger = 100L
+  val kafkaMaxOffsetsPreTrigger = 1000L
   val kafkaOutputTopic = "sergey_vyun_lab04b_out"
   val kafkaCheckPointLocation = "/tmp/sergey.vyun/chk/lab04/state"
 
