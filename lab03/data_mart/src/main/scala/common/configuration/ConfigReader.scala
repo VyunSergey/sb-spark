@@ -13,21 +13,22 @@ trait ConfigReader {
     val resource: List[String] = Source.fromInputStream(resourceStream).getLines.toList
 
     Config(
-      srcCassandraHost = parseLines(resource, "src-cassandra-host").get,
-      srcCassandraPort = parseLines(resource, "src-cassandra-port").get,
-      srcCassandraKeySpace = parseLines(resource, "src-cassandra-key-space").get,
-      srcCassandraTable = parseLines(resource, "src-cassandra-table").get,
-      srcElasticsearchHost = parseLines(resource, "src-elasticsearch-host").get,
-      srcElasticsearchIndex = parseLines(resource, "src-elasticsearch-index").get,
-      srcHDFSPath = parseLines(resource, "src-hdfs-path").get,
-      srcPostgresHost = parseLines(resource, "src-postgres-host").get,
-      srcPostgresPort = parseLines(resource, "src-postgres-port").get,
-      srcPostgresSchema = parseLines(resource, "src-postgres-schema").get,
-      srcPostgresTable = parseLines(resource, "src-postgres-table").get,
-      tgtPostgresHost = parseLines(resource, "tgt-postgres-host").get,
-      tgtPostgresPort = parseLines(resource, "tgt-postgres-port").get,
-      tgtPostgresSchema = parseLines(resource, "tgt-postgres-schema").get,
-      tgtPostgresTable = parseLines(resource, "tgt-postgres-table").get
+      cassandraHost = parseLines(resource, "cassandra-host").get,
+      cassandraPort = parseLines(resource, "cassandra-port").get,
+      cassandraKeySpace = parseLines(resource, "cassandra-key-space").get,
+      cassandraTable = parseLines(resource, "cassandra-table").get,
+      elasticsearchHost = parseLines(resource, "elasticsearch-host").get,
+      elasticsearchPort = parseLines(resource, "elasticsearch-port").get,
+      elasticsearchIndex = parseLines(resource, "elasticsearch-index").get,
+      hdfsPath = parseLines(resource, "hdfs-path").get,
+      postgresHost = parseLines(resource, "postgres-host").get,
+      postgresPort = parseLines(resource, "postgres-port").get,
+      postgresUser = parseLines(resource, "postgres-user").get,
+      postgresPassword = parseLines(resource, "postgres-password").get,
+      postgresSrcSchema = parseLines(resource, "postgres-src-schema").get,
+      postgresSrcTable = parseLines(resource, "postgres-src-table").get,
+      postgresTgtSchema = parseLines(resource, "postgres-tgt-schema").get,
+      postgresTgtTable = parseLines(resource, "postgres-tgt-table").get
     )
   }
 
@@ -54,27 +55,28 @@ trait ConfigReader {
   }
 
   final def parseValue(value: String): String = {
-    value.trim.toLowerCase.replaceAll("\"", "")
+    value.trim.replaceAll("\"", "")
   }
 }
 
 object ConfigReader extends ConfigReader {
 
   final case class Config(
-                           srcCassandraHost: String,
-                           srcCassandraPort: String,
-                           srcCassandraKeySpace: String,
-                           srcCassandraTable: String,
-                           srcElasticsearchHost: String,
-                           srcElasticsearchIndex: String,
-                           srcHDFSPath: String,
-                           srcPostgresHost: String,
-                           srcPostgresPort: String,
-                           srcPostgresSchema: String,
-                           srcPostgresTable: String,
-                           tgtPostgresHost: String,
-                           tgtPostgresPort: String,
-                           tgtPostgresSchema: String,
-                           tgtPostgresTable: String
+                           cassandraHost: String,
+                           cassandraPort: String,
+                           cassandraKeySpace: String,
+                           cassandraTable: String,
+                           elasticsearchHost: String,
+                           elasticsearchPort: String,
+                           elasticsearchIndex: String,
+                           hdfsPath: String,
+                           postgresHost: String,
+                           postgresPort: String,
+                           postgresUser: String,
+                           postgresPassword: String,
+                           postgresSrcSchema: String,
+                           postgresSrcTable: String,
+                           postgresTgtSchema: String,
+                           postgresTgtTable: String
                          )
 }

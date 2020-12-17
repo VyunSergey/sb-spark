@@ -1,20 +1,16 @@
-name := "data_mart"
+name := "agg"
 
 version := "1.0"
 
 scalaVersion := "2.11.12"
 val sparkVersion = "2.4.7"
-val sparkCassandraConnectorVersion = "2.4.2"
-val sparkElasticsearchVersion = "7.9.1"
-val postgreSqlVersion = "42.2.10"
+val sparkKafkaVersion = "2.4.5"
 
 libraryDependencies ++= Seq(
-  "org.apache.spark"      %% "spark-core"                % sparkVersion % Provided,
-  "org.apache.spark"      %% "spark-sql"                 % sparkVersion % Provided,
-  "org.apache.spark"      %% "spark-hive"                % sparkVersion % Provided,
-  "com.datastax.spark"    %% "spark-cassandra-connector" % sparkCassandraConnectorVersion,
-  "org.elasticsearch"     %% "elasticsearch-spark-20"    % sparkElasticsearchVersion,
-  "org.postgresql"        %  "postgresql"                % postgreSqlVersion
+  "org.apache.spark"  %% "spark-core"             % sparkVersion % Provided,
+  "org.apache.spark"  %% "spark-sql"              % sparkVersion % Provided,
+  "org.apache.spark"  %% "spark-hive"             % sparkVersion % Provided,
+  "org.apache.spark"  %% "spark-sql-kafka-0-10"   % sparkKafkaVersion % Provided
 )
 
 scalacOptions ++= Seq(
