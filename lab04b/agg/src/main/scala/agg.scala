@@ -1,9 +1,13 @@
+import java.time.LocalDateTime
+import java.time.format.DateTimeFormatter
+
 import org.apache.spark.internal.Logging
 import org.apache.spark.sql.{DataFrame, SparkSession}
 import org.apache.spark.sql.types.{DoubleType, LongType, StringType, StructField, StructType}
 import org.apache.spark.sql.functions.{col, from_json, from_unixtime, min, struct, sum, to_json, to_timestamp, unix_timestamp, when, window}
 import org.apache.spark.sql.streaming.{OutputMode, Trigger}
 
+import scala.concurrent.duration._
 import scala.util.Random
 
 object agg extends App with Logging {
@@ -12,9 +16,10 @@ object agg extends App with Logging {
   val kafkaHosts = "spark-master-1:6667"
   val kafkaInputTopic = "sergey_vyun"
   val kafkaStartingOffsets = "earliest"
-  val kafkaMaxOffsetsPreTrigger = 1000L
+  val kafkaMaxOffsetsPreTrigger = 100L
   val kafkaOutputTopic = "sergey_vyun_lab04b_out"
-  val kafkaCheckPointLocation = s"/tmp/sergey.vyun/chk/lab04/state${Random.nextInt(1000)}"
+  val dateTimeNow: String = LocalDateTime.now.format(DateTimeFormatter.ofPattern("yyyy-MM-dd_hh:mm:ss"))
+  val kafkaCheckPointLocation = s"/tmp/sergey.vyun/chk/lab04/state_${dateTimeNow}_${Random.nextInt(1000)}"
 
   spark.sparkContext.setLogLevel("INFO")
 
@@ -85,5 +90,5 @@ object agg extends App with Logging {
     .option("topic", kafkaOutputTopic)
     .option("checkpointLocation", kafkaCheckPointLocation)
     .start
-    .processAllAvailable
+    .awaitTermination(3.minutes.toMillis)
 }
