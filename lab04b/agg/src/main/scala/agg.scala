@@ -11,7 +11,17 @@ import scala.concurrent.duration._
 import scala.util.Random
 
 object agg extends App with Logging {
-  lazy val spark: SparkSession = SparkSession.builder.getOrCreate
+  lazy val spark: SparkSession = SparkSession.builder
+    .appName("Sergey Vyun Lab04b")
+    .config("spark.driver.cores", 1)
+    .config("spark.driver.memory", "4g")
+    .config("spark.driver.maxResultSize", "1g")
+    .config("spark.executor.instances", 5)
+    .config("spark.executor.cores", 2)
+    .config("spark.executor.memory", "4g")
+    .config("spark.default.parallelism", 10)
+    .config("spark.sql.shuffle.partitions",10)
+    .getOrCreate
 
   val kafkaHosts = "spark-master-1:6667"
   val kafkaInputTopic = "sergey_vyun"
