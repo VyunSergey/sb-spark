@@ -16,9 +16,9 @@ object agg extends App with Logging {
   val kafkaHosts = "spark-master-1:6667"
   val kafkaInputTopic = "sergey_vyun"
   val kafkaStartingOffsets = "earliest"
-  val kafkaMaxOffsetsPreTrigger = 100L
+  val kafkaMaxOffsetsPreTrigger = 1000L
   val kafkaOutputTopic = "sergey_vyun_lab04b_out"
-  val dateTimeNow: String = LocalDateTime.now.format(DateTimeFormatter.ofPattern("yyyy-MM-dd_hh:mm:ss"))
+  val dateTimeNow: String = LocalDateTime.now.format(DateTimeFormatter.ofPattern("yyyy_MM_dd_hh_mm_ss"))
   val kafkaCheckPointLocation = s"/tmp/sergey.vyun/chk/lab04/state_${dateTimeNow}_${Random.nextInt(1000)}"
 
   spark.sparkContext.setLogLevel("INFO")
@@ -90,5 +90,5 @@ object agg extends App with Logging {
     .option("topic", kafkaOutputTopic)
     .option("checkpointLocation", kafkaCheckPointLocation)
     .start
-    .awaitTermination(3.minutes.toMillis)
+    .awaitTermination(10.minutes.toMillis)
 }
