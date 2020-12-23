@@ -18,7 +18,7 @@ object users_items extends App with Logging {
     .getOrCreate
 
   val hdfsInputPath = spark.conf.get("spark.users_items.input_dir", "/user/sergey.vyun/visits")
-  val hdfsOutPutPath = spark.conf.get("spark.users_items.output_dir", "/user/sergey.vyun/users-items")
+  val hdfsOutputPath = spark.conf.get("spark.users_items.output_dir", "/user/sergey.vyun/users-items")
   val modeFlag = spark.conf.get("spark.users_items.update", "0")
 
   spark.sparkContext.setLogLevel("INFO")
@@ -28,7 +28,7 @@ object users_items extends App with Logging {
 
   logInfo(s"[LAB05] Spark version: ${spark.version}")
   logInfo(s"[LAB05] HDFS Input path: $hdfsInputPath")
-  logInfo(s"[LAB05] HDFS Input path: $hdfsOutPutPath")
+  logInfo(s"[LAB05] HDFS Output path: $hdfsOutputPath")
   logInfo(s"[LAB05] mode (0 - insert, 1 - update): $modeFlag")
 
   val schema: StructType = StructType(
@@ -78,7 +78,7 @@ object users_items extends App with Logging {
     ).repartition(1)
   logInfoStatistics(usersItemsRes, "Users x Items Result", logUid)
 
-  write(usersItemsRes, hdfsOutPutPath + s"/$p_date", "parquet")
+  write(usersItemsRes, hdfsOutputPath + s"/$p_date", "parquet")
 
   def logInfoStatistics(df: DataFrame,
                         name: String,
