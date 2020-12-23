@@ -1,3 +1,4 @@
+import org.apache.log4j.{Level, Logger}
 import org.apache.spark.internal.Logging
 import org.apache.spark.sql.{Column, DataFrame, Encoder, SaveMode, SparkSession}
 import org.apache.spark.sql.types.{IntegerType, LongType, StringType, StructField, StructType}
@@ -21,6 +22,7 @@ object users_items extends App with Logging {
   val modeFlag = spark.conf.get("spark.users_items.update", "0")
 
   spark.sparkContext.setLogLevel("INFO")
+  Logger.getLogger("org.apache.spark").setLevel(Level.WARN)
 
   import spark.implicits._
 
@@ -40,25 +42,32 @@ object users_items extends App with Logging {
     StructField("p_date", IntegerType) :: Nil
   )
 
+  val logUid = "03001878-d923-4880-9c69-8b6884c7ad0e"
+
   val views: DataFrame = read(hdfsInputPath + "/view", "json", Some(schema))
     .withColumn("item_id", clearItemId("view", col("item_id")))
+  logInfoStatistics(views, "Views", logUid)
 
   val buys: DataFrame = read(hdfsInputPath + "/buy", "json", Some(schema))
     .withColumn("item_id", clearItemId("buy", col("item_id")))
+  logInfoStatistics(buys, "Buys", logUid)
 
   val p_date: Int = maxNum(
     maxDate[Int](views, col("p_date")),
     maxDate[Int](buys, col("p_date"))
   )
+  logInfo(s"[LAB05] Partition date: $p_date")
 
   val usersItems: DataFrame = views.groupBy('uid, 'item_id).count
     .union(buys.groupBy('uid, 'item_id).count)
     .select('uid, 'item_id, 'count)
+  logInfoStatistics(usersItems, "Users x Items", logUid)
 
   val usersItemsPivot: DataFrame = usersItems
     .groupBy('uid)
     .pivot('item_id)
     .agg(max('count))
+  logInfoStatistics(usersItemsPivot, "Users x Items Pivot", logUid)
 
   val usersItemsRes: DataFrame = usersItemsPivot
     .select(
@@ -67,8 +76,25 @@ object users_items extends App with Logging {
         case y => col(y)
       }: _*
     ).repartition(1)
+  logInfoStatistics(usersItemsRes, "Users x Items Result", logUid)
 
   write(usersItemsRes, hdfsOutPutPath + s"/$p_date", "parquet")
+
+  def logInfoStatistics(df: DataFrame,
+                        name: String,
+                        uid: String = "",
+                        logFunction: String => Unit = str => logInfo(str)): Unit = {
+    logFunction(s"[LAB05] $name count: ${df.count}")
+    logFunction(s"[LAB05] $name schema:\n${df.schema.treeString}")
+    logFunction(s"[LAB05] $name sample:\n${df.take(10).mkString("\n")}\n")
+    logFunction(s"[LAB05] $name sample uid = '$uid':\n${takeByUid(df, uid)}\n")
+  }
+
+  def takeByUid(df: DataFrame, uid: String, rows: Int = 100): String = {
+    if (df.columns.map(_.trim.toLowerCase).contains("uid"))
+      df.filter(col("uid") === uid).take(rows).mkString("\n")
+    else ""
+  }
 
   def read(path: String,
            format: String,
