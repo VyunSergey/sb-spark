@@ -68,7 +68,7 @@ object users_items extends App with Logging {
       }: _*
     ).repartition(1)
 
-  write(usersItemsRes, hdfsOutPutPath, "parquet")
+  write(usersItemsRes, hdfsOutPutPath + s"/$p_date", "parquet")
 
   def read(path: String,
            format: String,
