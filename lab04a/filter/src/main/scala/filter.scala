@@ -113,7 +113,7 @@ object filter extends App with Logging {
 
   logInfo(s"[LAB04A] Saving Views to path: $hdfsResultDirPrefix/view")
   write(
-    df = views.select(col("value"), col("p_date")).repartition(1),
+    df = views.select(col("value")).repartition(1),
     path = s"$hdfsResultDirPrefix/view/$max_p_date"//,
     //partitionBy = Seq("p_date")
   )
@@ -130,7 +130,7 @@ object filter extends App with Logging {
 
   logInfo(s"[LAB04A] Saving Buys to path: $hdfsResultDirPrefix/buy")
   write(
-    df = buys.select(col("value"), col("p_date")).repartition(1),
+    df = buys.select(col("value")).repartition(1),
     path = s"$hdfsResultDirPrefix/buy/$max_p_date"//,
     //partitionBy = Seq("p_date")
   )
