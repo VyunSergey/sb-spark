@@ -91,8 +91,8 @@ object users_items extends App with Logging {
   logInfoStatistics(buys, "Buys", logUid)
 
   val p_date: String = maxNum(
-    maxDate[String](views, col("p_date")),
-    maxDate[String](buys, col("p_date"))
+    maxDate[String](views, col("date")),
+    maxDate[String](buys, col("date"))
   )
   logInfo(s"[LAB05] Partition date: $p_date")
 
