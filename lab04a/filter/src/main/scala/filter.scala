@@ -43,7 +43,7 @@ object filter extends App with Logging {
   logInfo(s"[LAB04A] Kafka starting offsets: $kafkaStartingOffsets")
   logInfo(s"[LAB04A] HDFS result dir prefix: $hdfsResultDirPrefix")
 
-  val logUid = "03001878-d923-4880-9c69-8b6884c7ad0e"
+  val logUid = "5cafa3c48fa46dca527c4b6471795b76"
 
   val schema: StructType = StructType(
     StructField("event_type", StringType) ::
@@ -88,6 +88,7 @@ object filter extends App with Logging {
       col("event_type")
     )
     .repartition(col("p_date"))
+    .cache
   logInfoStatistics(df, "Data", logUid)
 
   val views: DataFrame = df.filter(col("event_type") === "view")
