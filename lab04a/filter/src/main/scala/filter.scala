@@ -122,6 +122,12 @@ object filter extends App with Logging {
   val views: DataFrame = df.filter(col("event_type") === "view")
   logInfoStatistics(views, "Views", logUid)
 
+  logInfo(s"[LAB04A] Clear saving path: $hdfsResultDirPrefix")
+  write(
+    df = spark.emptyDataFrame,
+    path = hdfsResultDirPrefix
+  )
+
   logInfo(s"[LAB04A] Saving Views to path: $hdfsResultDirPrefix/view")
   write(
     df = views.select(
