@@ -1,3 +1,4 @@
+import org.apache.log4j.{Level, Logger}
 import org.apache.spark.internal.Logging
 import org.apache.spark.sql.{Column, DataFrame, DataFrameWriter, Row, SaveMode, SparkSession}
 import org.apache.spark.sql.types.{LongType, StringType, StructField, StructType}
@@ -37,6 +38,7 @@ object filter extends App with Logging {
   }
 
   spark.sparkContext.setLogLevel("INFO")
+  Logger.getLogger("org.apache.spark").setLevel(Level.WARN)
   import spark.implicits._
 
   logInfo(s"[LAB04A] Spark version: ${spark.version}")
