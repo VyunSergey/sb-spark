@@ -2,7 +2,9 @@ import org.apache.log4j.{Level, Logger}
 import org.apache.spark.internal.Logging
 import org.apache.spark.sql.{Column, DataFrame, Encoder, SaveMode, SparkSession}
 import org.apache.spark.sql.types.{IntegerType, LongType, StringType, StructField, StructType}
-import org.apache.spark.sql.functions.{coalesce, col, concat_ws, lit, lower, max, regexp_replace, trim}
+import org.apache.spark.sql.functions.{date_add, date_format, coalesce, col, concat_ws, lit, lower, max, regexp_replace, trim, to_date}
+
+import scala.util.Try
 
 object users_items extends App with Logging {
   implicit lazy val spark: SparkSession = SparkSession.builder
@@ -17,9 +19,9 @@ object users_items extends App with Logging {
     .config("spark.sql.shuffle.partitions",10)
     .getOrCreate
 
-  val hdfsInputPath = spark.conf.get("spark.users_items.input_dir", "/user/sergey.vyun/visits")
-  val hdfsOutputPath = spark.conf.get("spark.users_items.output_dir", "/user/sergey.vyun/users-items")
-  val modeFlag = spark.conf.get("spark.users_items.update", "0")
+  val hdfsInputPath: String = spark.conf.get("spark.users_items.input_dir", "/user/sergey.vyun/visits")
+  val hdfsOutputPath: String = spark.conf.get("spark.users_items.output_dir", "/user/sergey.vyun/users-items")
+  val modeFlag: Int = Try(spark.conf.get("spark.users_items.update", "0").toInt).toOption.getOrElse(0)
 
   spark.sparkContext.setLogLevel("INFO")
   Logger.getLogger("org.apache.spark").setLevel(Level.WARN)
@@ -52,11 +54,17 @@ object users_items extends App with Logging {
     .withColumn("item_id", clearItemId("buy", col("item_id")))
   logInfoStatistics(buys, "Buys", logUid)
 
-  val p_date: Int = maxNum(
-    maxDate[Int](views, col("p_date")),
-    maxDate[Int](buys, col("p_date"))
+  val p_date: String = maxNum(
+    maxDate[String](views, col("p_date")),
+    maxDate[String](buys, col("p_date"))
   )
   logInfo(s"[LAB05] Partition date: $p_date")
+
+  val p_prev_date: String = Seq(p_date).toDF("date")
+    .select(
+      date_format(date_add(to_date(col("date"), "yyyyMMdd"), -1), "yyyyMMdd").as[String]
+    ).first
+  logInfo(s"[LAB05] Partition Prev date: $p_prev_date")
 
   val usersItems: DataFrame = views.groupBy('uid, 'item_id).count
     .union(buys.groupBy('uid, 'item_id).count)
@@ -78,7 +86,30 @@ object users_items extends App with Logging {
     ).repartition(1)
   logInfoStatistics(usersItemsRes, "Users x Items Result", logUid)
 
-  write(usersItemsRes, hdfsOutputPath + s"/$p_date", "parquet")
+  val usersItemsPrev: DataFrame =
+    if (modeFlag == 0) spark.emptyDataFrame
+    else {
+      val prev: DataFrame = read(hdfsOutputPath + s"/$p_prev_date", "parquet")
+      logInfoStatistics(prev, "Users x Items Prev", logUid)
+      prev
+    }
+
+  val result: DataFrame =
+    if (modeFlag == 0) usersItemsRes
+    else {
+      usersItemsPrev
+        .union {
+          usersItemsRes
+            .select(
+              usersItemsPrev.columns.map { colNm =>
+                if (usersItemsRes.columns.contains(colNm)) col(colNm).as(colNm)
+                else lit(0).as(colNm)
+              }: _*
+            )
+        }
+    }
+
+  write(result, hdfsOutputPath + s"/$p_date", "parquet")
 
   def logInfoStatistics(df: DataFrame,
                         name: String,
