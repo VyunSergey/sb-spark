@@ -33,7 +33,7 @@ object users_items extends App with Logging {
   logInfo(s"[LAB05] HDFS Output path: $hdfsOutputPath")
   logInfo(s"[LAB05] mode (0 - insert, 1 - update): $modeFlag")
 
-  val schema: StructType = StructType(
+  val schema0: StructType = StructType(
     StructField("category", StringType) ::
     StructField("date", StringType) ::
     StructField("event_type", StringType) ::
@@ -44,13 +44,33 @@ object users_items extends App with Logging {
     StructField("p_date", IntegerType) :: Nil
   )
 
+  val schema1: StructType = StructType(
+    StructField("category", StringType) ::
+    StructField("event_type", StringType) ::
+    StructField("item_id", StringType) ::
+    StructField("item_price", LongType) ::
+    StructField("timestamp", LongType) ::
+    StructField("uid", StringType) ::
+    StructField("date", StringType) :: Nil
+  )
+
   val logUid = "03001878-d923-4880-9c69-8b6884c7ad0e"
 
-  val views: DataFrame = read(hdfsInputPath + "/view", "json", Some(schema))
+  val viewsSrc: DataFrame =
+    if (modeFlag == 0) read(hdfsInputPath + "/view", "json", Some(schema0))
+    else read(hdfsInputPath + "/view", "json", Some(schema1))
+  logInfoStatistics(viewsSrc, "Views Source", logUid)
+
+  val views: DataFrame = viewsSrc
     .withColumn("item_id", clearItemId("view", col("item_id")))
   logInfoStatistics(views, "Views", logUid)
 
-  val buys: DataFrame = read(hdfsInputPath + "/buy", "json", Some(schema))
+  val buysSrc: DataFrame =
+    if (modeFlag == 0) read(hdfsInputPath + "/buy", "json", Some(schema0))
+    else read(hdfsInputPath + "/buy", "json", Some(schema1))
+  logInfoStatistics(buysSrc, "Buys Source", logUid)
+
+  val buys: DataFrame = buysSrc
     .withColumn("item_id", clearItemId("buy", col("item_id")))
   logInfoStatistics(buys, "Buys", logUid)
 
