@@ -192,22 +192,34 @@ object filter extends App with Logging {
   }
 
   def copyDir(from: String, to: String): Unit = {
-    val pathFrom: Path = Paths.get(new File(from).toURI)
-    val pathTo: Path = Paths.get(new File(to).toURI)
+    val pathFrom: Path = Paths.get(new File(from.replace("file://", "")).toURI)
+    val pathTo: Path = Paths.get(new File(to.replace("file://", "")).toURI)
     Files.walkFileTree(pathFrom, new CopyDirVisitor(pathFrom, pathTo, StandardCopyOption.REPLACE_EXISTING))
   }
 
-  class CopyDirVisitor(pathFrom: Path, pathTo: Path, copyOption: CopyOption) extends SimpleFileVisitor[Path] {
+  class CopyDirVisitor(pathFrom: Path,
+                       pathTo: Path,
+                       copyOption: CopyOption,
+                       logFunction: String => Unit = str => logInfo(str)) extends SimpleFileVisitor[Path] {
     override def preVisitDirectory(dir: Path, attrs: BasicFileAttributes): FileVisitResult = {
+      logFunction(s"[LAB04A] Current dir: $dir")
+      logFunction(s"[LAB04A] Relativize dir: ${pathFrom.relativize(dir)}")
       val targetPath: Path = pathTo.resolve(pathFrom.relativize(dir))
+      logFunction(s"[LAB04A] Target dir: $targetPath")
       if(!Files.exists(targetPath)) {
+        logFunction(s"[LAB04A] Creating dir: $targetPath")
         Files.createDirectory(targetPath)
       }
       FileVisitResult.CONTINUE
     }
 
     override def visitFile(file: Path, attrs: BasicFileAttributes): FileVisitResult = {
-      Files.copy(file, pathTo.resolve(pathFrom.relativize(file)), copyOption)
+      logFunction(s"[LAB04A] Current file: $file")
+      logFunction(s"[LAB04A] Relativize file: ${pathFrom.relativize(file)}")
+      val targetFile: Path = pathTo.resolve(pathFrom.relativize(file))
+      logFunction(s"[LAB04A] Target file: $targetFile")
+      logFunction(s"[LAB04A] Copping file: $file to file: $targetFile")
+      Files.copy(file, targetFile, copyOption)
       FileVisitResult.CONTINUE
     }
   }
