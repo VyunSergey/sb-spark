@@ -27,6 +27,7 @@ object filter extends App with Logging {
     )
 
   lazy val hdfsResultDirPrefix = spark.conf.get("spark.filter.output_dir_prefix", "/user/sergey.vyun/visits")
+  lazy val homeResultDirPrefix = "file:///data/home/sergey.vyun/visits2/"
 
   def parseOffset(offset: String, topic: String): String = {
     Try(offset.toInt) match {
@@ -111,6 +112,13 @@ object filter extends App with Logging {
     partitionBy = Seq("p_date")
   )
 
+  logInfo(s"[LAB04A] Saving Views to Home path: $homeResultDirPrefix/view")
+  write(
+    df = views.select(col("value"), col("p_date")),
+    path = s"$homeResultDirPrefix/view",
+    partitionBy = Seq("p_date")
+  )
+
   val buys: DataFrame = df.filter(col("event_type") === "buy")
   logInfoStatistics(buys, "Buys", logUid)
 
@@ -118,6 +126,13 @@ object filter extends App with Logging {
   write(
     df = buys.select(col("value"), col("p_date")),
     path = s"$hdfsResultDirPrefix/buy",
+    partitionBy = Seq("p_date")
+  )
+
+  logInfo(s"[LAB04A] Saving Buys to Home path: $homeResultDirPrefix/buy")
+  write(
+    df = buys.select(col("value"), col("p_date")),
+    path = s"$homeResultDirPrefix/buy",
     partitionBy = Seq("p_date")
   )
 
