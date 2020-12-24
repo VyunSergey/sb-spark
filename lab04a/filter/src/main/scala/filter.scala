@@ -124,7 +124,7 @@ object filter extends App with Logging {
 
   logInfo(s"[LAB04A] Clear saving path: $hdfsResultDirPrefix")
   write(
-    df = Seq(1).toDF,
+    df = Seq("").toDF,
     path = hdfsResultDirPrefix
   )
 
