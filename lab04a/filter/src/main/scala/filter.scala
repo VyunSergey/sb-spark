@@ -1,6 +1,6 @@
 import org.apache.spark.internal.Logging
 import org.apache.spark.sql.{Column, DataFrame, DataFrameWriter, Row, SaveMode, SparkSession}
-import org.apache.spark.sql.types.{LongType, StringType, StructField, StructType}
+import org.apache.spark.sql.types.{IntegerType, LongType, StringType, StructField, StructType}
 import org.apache.spark.sql.functions.{col, date_add, date_format, from_json, from_unixtime, max, struct, to_date, to_json}
 
 import scala.util.{Success, Try}
@@ -103,8 +103,8 @@ object filter extends App with Logging {
     .cache
   logInfoStatistics(p_date, "Partition Date", logUid)
 
-  val max_p_date: Int = p_date
-    .select(col("max_p_date").as[Int])
+  val max_p_date: String = p_date
+    .select(col("max_p_date").as[String])
     .first
   logInfo(s"[LAB04A] Partition Date: $max_p_date")
 
