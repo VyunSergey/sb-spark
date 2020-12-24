@@ -1,5 +1,5 @@
 import org.apache.spark.internal.Logging
-import org.apache.spark.sql.{Column, DataFrame, SaveMode, SparkSession}
+import org.apache.spark.sql.{Column, DataFrame, DataFrameWriter, Row, SaveMode, SparkSession}
 import org.apache.spark.sql.types.{LongType, StringType, StructField, StructType}
 import org.apache.spark.sql.functions.{col, date_add, date_format, from_json, from_unixtime, max, struct, to_date, to_json}
 
@@ -37,6 +37,7 @@ object filter extends App with Logging {
   }
 
   spark.sparkContext.setLogLevel("INFO")
+  import spark.implicits._
 
   logInfo(s"[LAB04A] Spark version: ${spark.version}")
   logInfo(s"[LAB04A] Kafka hosts: $kafkaHosts")
@@ -102,41 +103,47 @@ object filter extends App with Logging {
     .cache
   logInfoStatistics(p_date, "Partition Date", logUid)
 
+  val max_p_date: Int = p_date
+    .select(col("max_p_date").as[Int])
+    .first
+  logInfo(s"[LAB04A] Partition Date: $max_p_date")
+
   val views: DataFrame = df.filter(col("event_type") === "view")
   logInfoStatistics(views, "Views", logUid)
 
   logInfo(s"[LAB04A] Saving Views to path: $hdfsResultDirPrefix/view")
   write(
-    df = views.select(col("value"), col("p_date")),
-    path = s"$hdfsResultDirPrefix/view",
-    partitionBy = Seq("p_date")
+    df = views.select(col("value"), col("p_date")).repartition(1),
+    path = s"$hdfsResultDirPrefix/view/$max_p_date"//,
+    //partitionBy = Seq("p_date")
   )
-
+/*
   logInfo(s"[LAB04A] Saving Views to Home path: $homeResultDirPrefix/view")
   write(
     df = views.select(col("value"), col("p_date")),
     path = s"$homeResultDirPrefix/view",
     partitionBy = Seq("p_date")
   )
-
+*/
   val buys: DataFrame = df.filter(col("event_type") === "buy")
   logInfoStatistics(buys, "Buys", logUid)
 
   logInfo(s"[LAB04A] Saving Buys to path: $hdfsResultDirPrefix/buy")
   write(
-    df = buys.select(col("value"), col("p_date")),
-    path = s"$hdfsResultDirPrefix/buy",
-    partitionBy = Seq("p_date")
+    df = buys.select(col("value"), col("p_date")).repartition(1),
+    path = s"$hdfsResultDirPrefix/buy/$max_p_date"//,
+    //partitionBy = Seq("p_date")
   )
-
+/*
   logInfo(s"[LAB04A] Saving Buys to Home path: $homeResultDirPrefix/buy")
   write(
     df = buys.select(col("value"), col("p_date")),
     path = s"$homeResultDirPrefix/buy",
     partitionBy = Seq("p_date")
   )
-
+*/
   def convertDate(unixTimestamp: Column): Column = {
+    //date_format(to_date(from_unixtime(unixTimestamp / 1000)), "yyyyMMdd")
     date_format(date_add(to_date(from_unixtime(unixTimestamp / 1000)), -1), "yyyyMMdd")
   }
 
@@ -158,13 +165,20 @@ object filter extends App with Logging {
 
   def write(df: DataFrame,
             path: String,
-            partitionBy: Seq[String],
+            partitionBy: Seq[String] = Nil,
             format: String = "text",
             mode: SaveMode = SaveMode.Overwrite): Unit = {
-    df.write
-      .format(format)
-      .mode(mode)
-      .partitionBy(partitionBy: _*)
+    val writer: DataFrameWriter[Row] = if (partitionBy.nonEmpty)
+      df.write
+        .format(format)
+        .mode(mode)
+        .partitionBy(partitionBy: _*)
+    else
+      df.write
+        .format(format)
+        .mode(mode)
+
+    writer
       .save(path)
   }
 }
