@@ -1,11 +1,11 @@
-import java.io.File
-import java.nio.file.attribute.BasicFileAttributes
-import java.nio.file.{CopyOption, FileVisitResult, Files, Path, Paths, SimpleFileVisitor, StandardCopyOption}
+// import java.io.File
+// import java.nio.file.attribute.BasicFileAttributes
+// import java.nio.file.{CopyOption, FileVisitResult, Files, Path, Paths, SimpleFileVisitor, StandardCopyOption}
 
 import org.apache.spark.internal.Logging
 import org.apache.spark.sql.{Column, DataFrame, DataFrameWriter, Row, SaveMode, SparkSession}
 import org.apache.spark.sql.types.{LongType, StringType, StructField, StructType}
-import org.apache.spark.sql.functions.{col, date_add, date_format, from_json, from_unixtime, max, struct, to_date, to_json}
+import org.apache.spark.sql.functions.{col, date_add, date_format, from_json, from_unixtime, max, to_date}
 
 import scala.util.{Success, Try}
 
@@ -80,6 +80,7 @@ object filter extends App with Logging {
       convertDate(col("json.timestamp")).as("date")
     )
     .select(
+      /*
       to_json(
         struct(
           col("category"),
@@ -91,9 +92,15 @@ object filter extends App with Logging {
           col("date")
         )
       ).as("value"),
+      */
+      col("category"),
+      col("event_type"),
+      col("item_id"),
+      col("item_price"),
+      col("timestamp"),
       col("uid"),
-      col("date").as("p_date"),
-      col("event_type")
+      col("date"),
+      col("date").as("p_date")
     )
     .repartition(col("p_date"))
     .cache
@@ -117,8 +124,17 @@ object filter extends App with Logging {
 
   logInfo(s"[LAB04A] Saving Views to path: $hdfsResultDirPrefix/view")
   write(
-    df = views.select(col("value")).repartition(1),
-    path = s"$hdfsResultDirPrefix/view/$max_p_date"//,
+    df = views.select(
+      col("category"),
+      col("event_type"),
+      col("item_id"),
+      col("item_price"),
+      col("timestamp"),
+      col("uid"),
+      col("date")
+    ).repartition(1),
+    path = s"$hdfsResultDirPrefix/view/$max_p_date",
+    format = "json"//,
     //partitionBy = Seq("p_date")
   )
 /*
@@ -134,8 +150,17 @@ object filter extends App with Logging {
 
   logInfo(s"[LAB04A] Saving Buys to path: $hdfsResultDirPrefix/buy")
   write(
-    df = buys.select(col("value")).repartition(1),
-    path = s"$hdfsResultDirPrefix/buy/$max_p_date"//,
+    df = buys.select(
+      col("category"),
+      col("event_type"),
+      col("item_id"),
+      col("item_price"),
+      col("timestamp"),
+      col("uid"),
+      col("date")
+    ).repartition(1),
+    path = s"$hdfsResultDirPrefix/buy/$max_p_date",
+    format = "json"//,
     //partitionBy = Seq("p_date")
   )
 /*
@@ -191,7 +216,7 @@ object filter extends App with Logging {
     writer
       .save(path)
   }
-
+/*
   def copyDir(from: String, to: String): Unit = {
     val pathFrom: Path = Paths.get(new File(from.replace("file://", "")).toURI)
     val pathTo: Path = Paths.get(new File(to.replace("file://", "")).toURI)
@@ -224,4 +249,5 @@ object filter extends App with Logging {
       FileVisitResult.CONTINUE
     }
   }
+*/
 }
