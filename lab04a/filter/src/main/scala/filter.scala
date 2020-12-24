@@ -1,7 +1,7 @@
 import org.apache.spark.internal.Logging
-import org.apache.spark.sql.{DataFrame, SaveMode, SparkSession}
+import org.apache.spark.sql.{DataFrame, Dataset, Row, SaveMode, SparkSession}
 import org.apache.spark.sql.types.{LongType, StringType, StructField, StructType}
-import org.apache.spark.sql.functions.{col, date_format, from_json, from_unixtime, struct, to_date, to_json}
+import org.apache.spark.sql.functions.{col, date_format, from_json, from_unixtime, max, struct, to_date, to_json}
 
 import scala.util.{Success, Try}
 
@@ -90,6 +90,14 @@ object filter extends App with Logging {
     .repartition(col("p_date"))
     .cache
   logInfoStatistics(df, "Data", logUid)
+
+  val p_date: DataFrame = df
+    .select(
+      max(col("p_date")).as("max_p_date")
+    )
+    .limit(1)
+    .cache
+  logInfoStatistics(p_date, "Partition Date", logUid)
 
   val views: DataFrame = df.filter(col("event_type") === "view")
     .select(
