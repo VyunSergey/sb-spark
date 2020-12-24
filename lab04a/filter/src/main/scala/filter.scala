@@ -84,6 +84,7 @@ object filter extends App with Logging {
           col("date")
         )
       ).as("value"),
+      col("uid"),
       col("date").as("p_date"),
       col("event_type")
     )
@@ -100,26 +101,20 @@ object filter extends App with Logging {
   logInfoStatistics(p_date, "Partition Date", logUid)
 
   val views: DataFrame = df.filter(col("event_type") === "view")
-    .select(
-      col("value"),
-      col("p_date")
-    )
   logInfoStatistics(views, "Views", logUid)
 
-  views
+  logInfo(s"[LAB04A] Saving Views to path: $hdfsResultDirPrefix/view")
+  views.select(col("value"), col("p_date"))
     .write
     .mode(SaveMode.Overwrite)
     .partitionBy("p_date")
     .text(s"$hdfsResultDirPrefix/view")
 
   val buys: DataFrame = df.filter(col("event_type") === "buy")
-    .select(
-      col("value"),
-      col("p_date")
-    )
   logInfoStatistics(buys, "Buys", logUid)
 
-  buys
+  logInfo(s"[LAB04A] Saving Buys to path: $hdfsResultDirPrefix/buy")
+  buys.select(col("value"), col("p_date"))
     .write
     .mode(SaveMode.Overwrite)
     .partitionBy("p_date")
