@@ -1,7 +1,7 @@
 import org.apache.spark.internal.Logging
-import org.apache.spark.sql.{DataFrame, Dataset, Row, SaveMode, SparkSession}
+import org.apache.spark.sql.{Column, DataFrame, SaveMode, SparkSession}
 import org.apache.spark.sql.types.{LongType, StringType, StructField, StructType}
-import org.apache.spark.sql.functions.{col, date_format, from_json, from_unixtime, max, struct, to_date, to_json}
+import org.apache.spark.sql.functions.{col, date_add, date_format, from_json, from_unixtime, max, struct, to_date, to_json}
 
 import scala.util.{Success, Try}
 
@@ -63,6 +63,7 @@ object filter extends App with Logging {
     .select(
       from_json(col("value").cast(StringType), schema).as("json")
     )
+    .distinct
     .select(
       col("json.category").as("category"),
       col("json.event_type").as("event_type"),
@@ -70,7 +71,7 @@ object filter extends App with Logging {
       col("json.item_price").as("item_price"),
       col("json.timestamp").as("timestamp"),
       col("json.uid").as("uid"),
-      date_format(to_date(from_unixtime(col("json.timestamp") / 1000)), "yyyyMMdd").as("date")
+      convertDate(col("json.timestamp")).as("date")
     )
     .select(
       to_json(
@@ -104,21 +105,25 @@ object filter extends App with Logging {
   logInfoStatistics(views, "Views", logUid)
 
   logInfo(s"[LAB04A] Saving Views to path: $hdfsResultDirPrefix/view")
-  views.select(col("value"), col("p_date"))
-    .write
-    .mode(SaveMode.Overwrite)
-    .partitionBy("p_date")
-    .text(s"$hdfsResultDirPrefix/view")
+  write(
+    df = views.select(col("value"), col("p_date")),
+    path = s"$hdfsResultDirPrefix/view",
+    partitionBy = Seq("p_date")
+  )
 
   val buys: DataFrame = df.filter(col("event_type") === "buy")
   logInfoStatistics(buys, "Buys", logUid)
 
   logInfo(s"[LAB04A] Saving Buys to path: $hdfsResultDirPrefix/buy")
-  buys.select(col("value"), col("p_date"))
-    .write
-    .mode(SaveMode.Overwrite)
-    .partitionBy("p_date")
-    .text(s"$hdfsResultDirPrefix/buy")
+  write(
+    df = buys.select(col("value"), col("p_date")),
+    path = s"$hdfsResultDirPrefix/buy",
+    partitionBy = Seq("p_date")
+  )
+
+  def convertDate(unixTimestamp: Column): Column = {
+    date_format(date_add(to_date(from_unixtime(unixTimestamp / 1000)), -1), "yyyyMMdd")
+  }
 
   def logInfoStatistics(df: DataFrame,
                         name: String,
@@ -134,5 +139,17 @@ object filter extends App with Logging {
     if (df.columns.map(_.trim.toLowerCase).contains("uid"))
       df.filter(col("uid") === uid).take(rows).mkString("\n")
     else ""
+  }
+
+  def write(df: DataFrame,
+            path: String,
+            partitionBy: Seq[String],
+            format: String = "text",
+            mode: SaveMode = SaveMode.Overwrite): Unit = {
+    df.write
+      .format(format)
+      .mode(mode)
+      .partitionBy(partitionBy: _*)
+      .save(path)
   }
 }
