@@ -58,7 +58,7 @@ object users_items extends App with Logging {
 
   val viewsSrc: DataFrame =
     if (modeFlag == 0) read(hdfsInputPath + "/view", "json", Some(schema0))
-    else read(hdfsInputPath + "/view", "json", Some(schema1))
+    else read(hdfsInputPath + "/view/20200430", "json", Some(schema1))
   logInfoStatistics(viewsSrc, "Views Source", logUid)
 
   val views: DataFrame = viewsSrc
@@ -67,7 +67,7 @@ object users_items extends App with Logging {
 
   val buysSrc: DataFrame =
     if (modeFlag == 0) read(hdfsInputPath + "/buy", "json", Some(schema0))
-    else read(hdfsInputPath + "/buy", "json", Some(schema1))
+    else read(hdfsInputPath + "/buy/20200430", "json", Some(schema1))
   logInfoStatistics(buysSrc, "Buys Source", logUid)
 
   val buys: DataFrame = buysSrc
