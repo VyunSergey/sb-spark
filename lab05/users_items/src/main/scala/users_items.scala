@@ -88,11 +88,11 @@ object users_items extends App with Logging {
 
   val usersItemsPrev: DataFrame =
     if (modeFlag == 0) spark.emptyDataFrame
-    else {
-      val prev: DataFrame = read(hdfsOutputPath + s"/$p_prev_date", "parquet")
-      logInfoStatistics(prev, "Users x Items Prev", logUid)
-      prev
-    }
+    else read(hdfsOutputPath + s"/$p_prev_date", "parquet")
+  logInfoStatistics(usersItemsPrev, "Users x Items Prev", logUid)
+
+  logInfo(s"[LAB05] Users x Items Prev columns:\n${usersItemsPrev.columns.mkString("\n")}\n")
+  logInfo(s"[LAB05] Users x Items Result columns:\n${usersItemsRes.columns.mkString("\n")}\n")
 
   val result: DataFrame =
     if (modeFlag == 0) usersItemsRes
