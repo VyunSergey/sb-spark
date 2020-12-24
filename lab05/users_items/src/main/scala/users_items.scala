@@ -57,8 +57,16 @@ object users_items extends App with Logging {
   val logUid = "03001878-d923-4880-9c69-8b6884c7ad0e"
 
   val viewsSrc: DataFrame =
-    if (modeFlag == 0) read(hdfsInputPath + "/view", "json", Some(schema0))
-    else read(hdfsInputPath + "/view/20200430", "json", Some(schema1))
+    if (modeFlag == 0) {
+      val viewsPath = hdfsInputPath + "/view"
+      logInfo(s"[LAB05] Reading Views from path: $viewsPath")
+      read(viewsPath, "json", Some(schema0))
+    }
+    else {
+      val viewsPath = hdfsInputPath + "/view/20200430"
+      logInfo(s"[LAB05] Reading Views from path: $viewsPath")
+      read(viewsPath, "json", Some(schema1))
+    }
   logInfoStatistics(viewsSrc, "Views Source", logUid)
 
   val views: DataFrame = viewsSrc
@@ -66,8 +74,16 @@ object users_items extends App with Logging {
   logInfoStatistics(views, "Views", logUid)
 
   val buysSrc: DataFrame =
-    if (modeFlag == 0) read(hdfsInputPath + "/buy", "json", Some(schema0))
-    else read(hdfsInputPath + "/buy/20200430", "json", Some(schema1))
+    if (modeFlag == 0) {
+      val buysPath = hdfsInputPath + "/buy"
+      logInfo(s"[LAB05] Reading Buys from path: $buysPath")
+      read(buysPath, "json", Some(schema0))
+    }
+    else {
+      val buysPath = hdfsInputPath + "/buy/20200430"
+      logInfo(s"[LAB05] Reading Buys from path: $buysPath")
+      read(buysPath, "json", Some(schema1))
+    }
   logInfoStatistics(buysSrc, "Buys Source", logUid)
 
   val buys: DataFrame = buysSrc
