@@ -6,7 +6,17 @@ import org.apache.spark.sql.functions.{col, date_format, from_json, from_unixtim
 import scala.util.{Success, Try}
 
 object filter extends App with Logging {
-  lazy val spark: SparkSession = SparkSession.builder.getOrCreate
+  implicit lazy val spark: SparkSession = SparkSession.builder
+    .appName("Sergey Vyun Lab04a")
+    .config("spark.driver.cores", 1)
+    .config("spark.driver.memory", "4g")
+    .config("spark.driver.maxResultSize", "1g")
+    .config("spark.executor.instances", 5)
+    .config("spark.executor.cores", 2)
+    .config("spark.executor.memory", "4g")
+    .config("spark.default.parallelism", 10)
+    .config("spark.sql.shuffle.partitions",10)
+    .getOrCreate
 
   lazy val kafkaHosts = spark.conf.get("spark.filter.hosts", "spark-master-1:6667")
   lazy val kafkaTopic = spark.conf.get("spark.filter.topic_name", "lab04_input_data")
@@ -32,6 +42,8 @@ object filter extends App with Logging {
   logInfo(s"[LAB04A] Kafka topic: $kafkaTopic")
   logInfo(s"[LAB04A] Kafka starting offsets: $kafkaStartingOffsets")
   logInfo(s"[LAB04A] HDFS result dir prefix: $hdfsResultDirPrefix")
+
+  val logUid = "03001878-d923-4880-9c69-8b6884c7ad0e"
 
   val schema: StructType = StructType(
     StructField("event_type", StringType) ::
@@ -76,24 +88,47 @@ object filter extends App with Logging {
       col("event_type")
     )
     .repartition(col("p_date"))
+  logInfoStatistics(df, "Data", logUid)
 
-  df.filter(col("event_type") === "view")
+  val views: DataFrame = df.filter(col("event_type") === "view")
     .select(
       col("value"),
       col("p_date")
     )
+  logInfoStatistics(views, "Views", logUid)
+
+  views
     .write
     .mode(SaveMode.Overwrite)
     .partitionBy("p_date")
     .text(s"$hdfsResultDirPrefix/view")
 
-  df.filter(col("event_type") === "buy")
+  val buys: DataFrame = df.filter(col("event_type") === "buy")
     .select(
       col("value"),
       col("p_date")
     )
+  logInfoStatistics(buys, "Buys", logUid)
+
+  buys
     .write
     .mode(SaveMode.Overwrite)
     .partitionBy("p_date")
     .text(s"$hdfsResultDirPrefix/buy")
+
+  def logInfoStatistics(df: DataFrame,
+                        name: String,
+                        uid: String = "",
+                        logFunction: String => Unit = str => logInfo(str)): Unit = {
+    logFunction(s"[LAB04A] $name count: ${df.count}")
+    logFunction(s"[LAB04A] $name schema:\n${df.schema.treeString}")
+    logFunction(s"[LAB04A] $name sample:\n${df.take(10).mkString("\n")}\n")
+    logFunction(s"[LAB04A] $name sample uid = '$uid':\n${takeByUid(df, uid)}\n")
+  }
+
+  def takeByUid(df: DataFrame, uid: String, rows: Int = 100): String = {
+    if (df.columns.map(_.trim.toLowerCase).contains("uid"))
+      df.filter(col("uid") === uid).take(rows).mkString("\n")
+    else ""
+  }
 }
