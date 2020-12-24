@@ -146,11 +146,12 @@ object filter extends App with Logging {
     partitionBy = Seq("p_date")
   )
 */
+/*
   if (hdfsResultDirPrefix.startsWith("file://") && homeResultDirPrefix.startsWith("file://")) {
     logInfo(s"[LAB04A] Copy Results from path: $hdfsResultDirPrefix to path: $homeResultDirPrefix")
     copyDir(hdfsResultDirPrefix, homeResultDirPrefix)
   }
-
+*/
   def convertDate(unixTimestamp: Column): Column = {
     //date_format(to_date(from_unixtime(unixTimestamp / 1000)), "yyyyMMdd")
     date_format(date_add(to_date(from_unixtime(unixTimestamp / 1000)), -1), "yyyyMMdd")
