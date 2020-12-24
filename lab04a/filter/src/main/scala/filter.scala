@@ -1,6 +1,10 @@
+import java.io.File
+import java.nio.file.attribute.BasicFileAttributes
+import java.nio.file.{CopyOption, FileVisitResult, Files, Path, Paths, SimpleFileVisitor, StandardCopyOption}
+
 import org.apache.spark.internal.Logging
 import org.apache.spark.sql.{Column, DataFrame, DataFrameWriter, Row, SaveMode, SparkSession}
-import org.apache.spark.sql.types.{IntegerType, LongType, StringType, StructField, StructType}
+import org.apache.spark.sql.types.{LongType, StringType, StructField, StructType}
 import org.apache.spark.sql.functions.{col, date_add, date_format, from_json, from_unixtime, max, struct, to_date, to_json}
 
 import scala.util.{Success, Try}
@@ -27,7 +31,7 @@ object filter extends App with Logging {
     )
 
   lazy val hdfsResultDirPrefix = spark.conf.get("spark.filter.output_dir_prefix", "/user/sergey.vyun/visits")
-  lazy val homeResultDirPrefix = "file:///data/home/sergey.vyun/visits2/"
+  lazy val homeResultDirPrefix = "file:///data/home/sergey.vyun/visits2"
 
   def parseOffset(offset: String, topic: String): String = {
     Try(offset.toInt) match {
@@ -142,6 +146,11 @@ object filter extends App with Logging {
     partitionBy = Seq("p_date")
   )
 */
+  if (hdfsResultDirPrefix.startsWith("file://") && homeResultDirPrefix.startsWith("file://")) {
+    logInfo(s"[LAB04A] Copy Results from path: $hdfsResultDirPrefix to path: $homeResultDirPrefix")
+    copyDir(hdfsResultDirPrefix, homeResultDirPrefix)
+  }
+
   def convertDate(unixTimestamp: Column): Column = {
     //date_format(to_date(from_unixtime(unixTimestamp / 1000)), "yyyyMMdd")
     date_format(date_add(to_date(from_unixtime(unixTimestamp / 1000)), -1), "yyyyMMdd")
@@ -180,5 +189,26 @@ object filter extends App with Logging {
 
     writer
       .save(path)
+  }
+
+  def copyDir(from: String, to: String): Unit = {
+    val pathFrom: Path = Paths.get(new File(from).toURI)
+    val pathTo: Path = Paths.get(new File(to).toURI)
+    Files.walkFileTree(pathFrom, new CopyDirVisitor(pathFrom, pathTo, StandardCopyOption.REPLACE_EXISTING))
+  }
+
+  class CopyDirVisitor(pathFrom: Path, pathTo: Path, copyOption: CopyOption) extends SimpleFileVisitor[Path] {
+    override def preVisitDirectory(dir: Path, attrs: BasicFileAttributes): FileVisitResult = {
+      val targetPath: Path = pathTo.resolve(pathFrom.relativize(dir))
+      if(!Files.exists(targetPath)) {
+        Files.createDirectory(targetPath)
+      }
+      FileVisitResult.CONTINUE
+    }
+
+    override def visitFile(file: Path, attrs: BasicFileAttributes): FileVisitResult = {
+      Files.copy(file, pathTo.resolve(pathFrom.relativize(file)), copyOption)
+      FileVisitResult.CONTINUE
+    }
   }
 }
