@@ -124,7 +124,7 @@ object filter extends App with Logging {
 
   logInfo(s"[LAB04A] Clear saving path: $hdfsResultDirPrefix")
   write(
-    df = spark.emptyDataFrame,
+    df = Seq(1).toDF,
     path = hdfsResultDirPrefix
   )
 
