@@ -1,6 +1,7 @@
 import java.time.LocalDateTime
 import java.time.format.DateTimeFormatter
 
+import org.apache.log4j.{Level, Logger}
 import org.apache.spark.internal.Logging
 import org.apache.spark.sql.{DataFrame, SparkSession}
 import org.apache.spark.sql.types.{DoubleType, LongType, StringType, StructField, StructType}
@@ -8,7 +9,7 @@ import org.apache.spark.sql.functions.{col, from_json, from_unixtime, min, struc
 import org.apache.spark.sql.streaming.{OutputMode, Trigger}
 
 import scala.concurrent.duration._
-import scala.util.Random
+import scala.util.{Random, Try}
 
 object agg extends App with Logging {
   lazy val spark: SparkSession = SparkSession.builder
@@ -23,15 +24,17 @@ object agg extends App with Logging {
     .config("spark.sql.shuffle.partitions",10)
     .getOrCreate
 
-  val kafkaHosts = "spark-master-1:6667"
-  val kafkaInputTopic = "sergey_vyun"
-  val kafkaStartingOffsets = "earliest"
-  val kafkaMaxOffsetsPreTrigger = 1000L
-  val kafkaOutputTopic = "sergey_vyun_lab04b_out"
+  val kafkaHosts = spark.conf.get("spark.agg.kafka.hosts", "spark-master-1:6667")
+  val kafkaInputTopic = spark.conf.get("spark.agg.kafka.input.topic", "sergey_vyun")
+  val kafkaStartingOffsets = spark.conf.get("spark.agg.kafka.input.start.offset", "earliest")
+  val kafkaMaxOffsetsPreTrigger =
+    Try(spark.conf.get("spark.agg.kafka.input.max.offsets", "1000").toLong).getOrElse(1000L)
+  val kafkaOutputTopic = spark.conf.get("spark.agg.kafka.output.topic", "sergey_vyun_lab04b_out")
   val dateTimeNow: String = LocalDateTime.now.format(DateTimeFormatter.ofPattern("yyyy_MM_dd_hh_mm_ss"))
-  val kafkaCheckPointLocation = s"/tmp/sergey.vyun/chk/lab04/state_${dateTimeNow}_${Random.nextInt(1000)}"
+  val kafkaCheckPointLocation = spark.conf.get("spark.agg.kafka.checkpoint.location", s"/tmp/sergey.vyun/chk/lab04/state_${dateTimeNow}_${Random.nextInt(1000)}")
 
   spark.sparkContext.setLogLevel("INFO")
+  Logger.getLogger("org.apache.spark").setLevel(Level.WARN)
 
   logInfo(s"[LAB04B] Spark version: ${spark.version}")
   logInfo(s"[LAB04B] Kafka hosts: $kafkaHosts")
@@ -95,7 +98,7 @@ object agg extends App with Logging {
     .writeStream
     .format("kafka")
     .outputMode(OutputMode.Update)
-    .trigger(Trigger.ProcessingTime("30 seconds"))
+    .trigger(Trigger.ProcessingTime(30.seconds))
     .option("kafka.bootstrap.servers", kafkaHosts)
     .option("topic", kafkaOutputTopic)
     .option("checkpointLocation", kafkaCheckPointLocation)
