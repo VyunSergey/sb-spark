@@ -23,7 +23,7 @@ object features  extends App with Logging {
   val hdfsInputPath: String = spark.conf.get("spark.features.users_items_dir", "/user/sergey.vyun/users-items/20200429")
   val jsonInputPath: String = spark.conf.get("spark.features.weblogs_dir", "/labs/laba03/weblogs.json")
   val hdfsOutputPath: String = spark.conf.get("spark.features.output", "/user/sergey.vyun/features/")
-  val logUID: String = "d50192e5-c44e-4ae8-ae7a-7cfe67c8b777"
+  val logUID: String = "d502331d-621e-4721-ada2-5d30b2c3801f"
 
   spark.conf.set("spark.sql.session.timeZone", "UTC")
   spark.sparkContext.setLogLevel("INFO")
