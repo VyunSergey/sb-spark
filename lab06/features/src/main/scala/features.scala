@@ -8,14 +8,11 @@ import org.apache.spark.sql.types._
 object features  extends App with Logging {
   implicit lazy val spark: SparkSession = SparkSession.builder
     .appName("Sergey Vyun Lab06")
-    .config("spark.driver.cores", 1)
-    .config("spark.driver.memory", "4g")
-    .config("spark.driver.maxResultSize", "1g")
-    .config("spark.executor.instances", 5)
+    .config("spark.executor.instances", 10)
     .config("spark.executor.cores", 2)
     .config("spark.executor.memory", "4g")
-    .config("spark.default.parallelism", 10)
-    .config("spark.sql.shuffle.partitions",10)
+    .config("spark.default.parallelism", 20)
+    .config("spark.sql.shuffle.partitions",20)
     .getOrCreate
 
   val hdfsInputPath: String = spark.conf.get("spark.features.users_items_dir", "/user/sergey.vyun/users-items/20200429")
@@ -31,11 +28,7 @@ object features  extends App with Logging {
   logInfo(s"[LAB06] HDFS Input path: $hdfsInputPath")
   logInfo(s"[LAB06] JSON Input path: $jsonInputPath")
   logInfo(s"[LAB06] HDFS Output path: $hdfsOutputPath")
-/*
-  val decoder: String => Option[String] = (url: String) =>
-    scala.util.Try(new java.net.URL(java.net.URLDecoder.decode(url)).getHost).toOption
-  val decoderUdf: UserDefinedFunction = udf(decoder)
-*/
+
   val schema = StructType(
     StructField("uid", StringType) ::
     StructField("visits", ArrayType(
@@ -61,17 +54,8 @@ object features  extends App with Logging {
     .select(
       col("uid"),
       regexp_replace(
-        lower(trim(callUDF("parse_url", col("visits.url"), lit("HOST")))),
-      "www\\.", "").as("domain"),
-/*
-      lower(trim(decoderUdf(
-        regexp_replace(
-          regexp_replace(
-            regexp_replace(col("visits.url"), "(http(s)?:\\/\\/https(:)?\\/\\/)", "https:\\/\\/"),
-            "(http(s)?:\\/\\/http(:)?\\/\\/)", "http:\\/\\/"),
-          "www\\.", "")
-      ))).as("domain"),
-*/
+        lower(callUDF("parse_url", col("visits.url"), lit("HOST"))),
+      "www.", "").as("domain"),
       col("visits.url").as("url"),
       from_unixtime(col("visits.timestamp") / 1000).as("timestamp")
     )
@@ -87,12 +71,13 @@ object features  extends App with Logging {
   val groupWebLogs: DataFrame = webLogs
     .groupBy(col("domain"))
     .count
+    .repartition(1)
     .withColumn("rn", row_number().over(Window.orderBy(col("count").desc, col("domain"))))
     .filter(col("rn") <= 1000)
     .cache
   logInfoStatistics(groupWebLogs, "GroupWeblogs", logUID)
 
-  val notUsedDomain = "NOT_USED"
+  val notUsedDomain = "__NOT_USED__"
 
   val topWebLogs: DataFrame = webLogs
     .join(broadcast(groupWebLogs), Seq("domain"), "left")
@@ -111,7 +96,10 @@ object features  extends App with Logging {
     .select(
       col("uid"),
       array(
-        domainWebLogs.columns.filterNot(Seq("uid", notUsedDomain).contains(_)).map { colNm =>
+        domainWebLogs.columns
+          .filterNot(Seq("uid", notUsedDomain).contains(_))
+          .sorted
+          .map { colNm =>
           coalesce(col(s"`$colNm`"), lit(0L)).as(s"`$colNm`")
         }: _*
       ).as("domain_features")
@@ -156,13 +144,13 @@ object features  extends App with Logging {
       .select(
         col("uid") +:
         weekWebLogs.columns.filterNot(_ == "uid").map { colNm =>
-          coalesce(col(s"`$colNm`"), lit(0L)).as(s"`$colNm`")
+          coalesce(col(colNm), lit(0L)).as(colNm)
         }: _*), Seq("uid"), "left")
     .join(hourWebLogs
       .select(
         col("uid") +:
           hourWebLogs.columns.filterNot(_ == "uid").map { colNm =>
-            coalesce(col(s"`$colNm`"), lit(0L)).as(s"`$colNm`")
+            coalesce(col(colNm), lit(0L)).as(colNm)
           }: _*), Seq("uid"), "left")
     .join(fractionWebLogs, Seq("uid"), "left")
   logInfoStatistics(resultWebLogs, "ResultWeblogs", logUID)
