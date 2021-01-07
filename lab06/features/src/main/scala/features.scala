@@ -1,11 +1,9 @@
 import org.apache.log4j.{Level, Logger}
 import org.apache.spark.internal.Logging
 import org.apache.spark.sql.{Column, DataFrame, SaveMode, SparkSession}
-import org.apache.spark.sql.expressions.{UserDefinedFunction, Window}
+import org.apache.spark.sql.expressions._
 import org.apache.spark.sql.functions._
 import org.apache.spark.sql.types._
-
-import scala.util.Try
 
 object features  extends App with Logging {
   implicit lazy val spark: SparkSession = SparkSession.builder
@@ -33,14 +31,25 @@ object features  extends App with Logging {
   logInfo(s"[LAB06] HDFS Input path: $hdfsInputPath")
   logInfo(s"[LAB06] JSON Input path: $jsonInputPath")
   logInfo(s"[LAB06] HDFS Output path: $hdfsOutputPath")
-
+/*
   val decoder: String => Option[String] = (url: String) =>
-    Try(new java.net.URL(java.net.URLDecoder.decode(url)).getHost).toOption
+    scala.util.Try(new java.net.URL(java.net.URLDecoder.decode(url)).getHost).toOption
   val decoderUdf: UserDefinedFunction = udf(decoder)
+*/
+  val schema = StructType(
+    StructField("uid", StringType) ::
+    StructField("visits", ArrayType(
+      StructType(
+        StructField("timestamp", LongType) ::
+        StructField("url", StringType) :: Nil
+      )
+    )) :: Nil
+  )
 
   val webLogs: DataFrame = spark
     .read
     .format("json")
+    .schema(schema)
     .option("inferSchema", "false")
     .load(jsonInputPath)
     .filter(col("uid").isNotNull)
@@ -51,6 +60,10 @@ object features  extends App with Logging {
     )
     .select(
       col("uid"),
+      regexp_replace(
+        lower(trim(callUDF("parse_url", col("visits.url"), lit("HOST")))),
+      "www\\.", "").as("domain"),
+/*
       lower(trim(decoderUdf(
         regexp_replace(
           regexp_replace(
@@ -58,9 +71,17 @@ object features  extends App with Logging {
             "(http(s)?:\\/\\/http(:)?\\/\\/)", "http:\\/\\/"),
           "www\\.", "")
       ))).as("domain"),
+*/
       col("visits.url").as("url"),
       from_unixtime(col("visits.timestamp") / 1000).as("timestamp")
     )
+    .withColumn("weekday", toDayOfWeek(lower(date_format(col("timestamp"), "E"))))
+    .withColumn("hour", date_format(col("timestamp"), "H"))
+    .withColumn("work_hours_flg", toWorkHours(col("hour")))
+    .withColumn("evening_hours_flg", toEveningHours(col("hour")))
+    .withColumn("hour", toHourOfDay(col("hour")))
+    .filter(col("domain").isNotNull)
+    .cache
   logInfoStatistics(webLogs, "Weblogs", logUID)
 
   val groupWebLogs: DataFrame = webLogs
@@ -70,10 +91,13 @@ object features  extends App with Logging {
     .filter(col("rn") <= 1000)
   logInfoStatistics(groupWebLogs, "GroupWeblogs", logUID)
 
+  val notUsedDomain = "NOT_USED"
+
   val topWebLogs: DataFrame = webLogs
-    .join(broadcast(groupWebLogs), Seq("domain"), "inner")
-    .orderBy(col("domain"), col("uid"))
-    .cache
+    .join(broadcast(groupWebLogs), Seq("domain"), "left")
+    .withColumn("domain", when(col("rn").isNotNull, col("domain")).otherwise(lit(notUsedDomain)))
+    .repartition(col("domain"))
+    .sortWithinPartitions(col("domain"), col("uid"))
   logInfoStatistics(topWebLogs, "TopWeblogs", logUID)
 
   val domainWebLogs: DataFrame = topWebLogs
@@ -86,43 +110,43 @@ object features  extends App with Logging {
     .select(
       col("uid"),
       array(
-        domainWebLogs.columns.filterNot(_ == "uid").map { colNm =>
-          coalesce(col(s"`$colNm`"), lit(0L)).as(colNm)
+        domainWebLogs.columns.filterNot(Seq("uid", notUsedDomain).contains(_)).map { colNm =>
+          coalesce(col(s"`$colNm`"), lit(0L)).as(s"`$colNm`")
         }: _*
       ).as("domain_features")
     )
   logInfoStatistics(vectorWebLogs, "VectorWeblogs", logUID)
 
-  val weekWebLogs: DataFrame = topWebLogs
+  val weekWebLogs: DataFrame = webLogs
     .select(
       col("uid"),
-      toDayOfWeek(dayofweek(col("timestamp"))).as("week")
+      col("weekday")
     )
     .groupBy(col("uid"))
-    .pivot(col("week"))
+    .pivot(col("weekday"))
     .agg(sum(lit(1L)))
   logInfoStatistics(weekWebLogs, "WeekWeblogs", logUID)
 
-  val hourWebLogs: DataFrame = topWebLogs
+  val hourWebLogs: DataFrame = webLogs
     .select(
       col("uid"),
-      toHourOfDay(hour(col("timestamp"))).as("hour")
+      col("hour")
     )
     .groupBy(col("uid"))
     .pivot(col("hour"))
     .agg(sum(lit(1L)))
   logInfoStatistics(hourWebLogs, "HourWeblogs", logUID)
 
-  val fractionWebLogs: DataFrame = topWebLogs
+  val fractionWebLogs: DataFrame = webLogs
     .select(
       col("uid"),
-      toWorkHours(hour(col("timestamp"))).as("work_hours"),
-      toEveningHours(hour(col("timestamp"))).as("evening_hours")
+      col("work_hours_flg"),
+      col("evening_hours_flg")
     )
     .groupBy(col("uid"))
     .agg(
-      (sum(col("work_hours")).cast(DoubleType) / sum(lit(1L)).cast(DoubleType)).as("web_fraction_work_hours"),
-      (sum(col("evening_hours")).cast(DoubleType) / sum(lit(1L)).cast(DoubleType)).as("web_fraction_evening_hours")
+      (sum(col("work_hours_flg")).cast(DoubleType) / sum(lit(1L)).cast(DoubleType)).as("web_fraction_work_hours"),
+      (sum(col("evening_hours_flg")).cast(DoubleType) / sum(lit(1L)).cast(DoubleType)).as("web_fraction_evening_hours")
     )
   logInfoStatistics(fractionWebLogs, "FractionWeblogs", logUID)
 
@@ -131,13 +155,13 @@ object features  extends App with Logging {
       .select(
         col("uid") +:
         weekWebLogs.columns.filterNot(_ == "uid").map { colNm =>
-          coalesce(col(s"`$colNm`"), lit(0L)).as(colNm)
+          coalesce(col(s"`$colNm`"), lit(0L)).as(s"`$colNm`")
         }: _*), Seq("uid"), "left")
     .join(hourWebLogs
       .select(
         col("uid") +:
           hourWebLogs.columns.filterNot(_ == "uid").map { colNm =>
-            coalesce(col(s"`$colNm`"), lit(0L)).as(colNm)
+            coalesce(col(s"`$colNm`"), lit(0L)).as(s"`$colNm`")
           }: _*), Seq("uid"), "left")
     .join(fractionWebLogs, Seq("uid"), "left")
   logInfoStatistics(resultWebLogs, "ResultWeblogs", logUID)
@@ -159,15 +183,10 @@ object features  extends App with Logging {
     .mode(SaveMode.Overwrite)
     .save(hdfsOutputPath)
 
+  webLogs.unpersist
+
   def toDayOfWeek(column: Column): Column = {
-    when(column === 1, "web_day_sun")
-      .when(column === 2, "web_day_mon")
-      .when(column === 3, "web_day_tue")
-      .when(column === 4, "web_day_wed")
-      .when(column === 5, "web_day_thu")
-      .when(column === 6, "web_day_fri")
-      .when(column === 7, "web_day_sat")
-      .otherwise("web_day_sun")
+    concat(lit("web_day_"), column.cast(StringType))
   }
 
   def toHourOfDay(column: Column): Column = {
