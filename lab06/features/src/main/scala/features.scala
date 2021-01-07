@@ -89,6 +89,7 @@ object features  extends App with Logging {
     .count
     .withColumn("rn", row_number().over(Window.orderBy(col("count").desc, col("domain"))))
     .filter(col("rn") <= 1000)
+    .cache
   logInfoStatistics(groupWebLogs, "GroupWeblogs", logUID)
 
   val notUsedDomain = "NOT_USED"
@@ -184,6 +185,7 @@ object features  extends App with Logging {
     .save(hdfsOutputPath)
 
   webLogs.unpersist
+  groupWebLogs.unpersist
 
   def toDayOfWeek(column: Column): Column = {
     concat(lit("web_day_"), column.cast(StringType))
